@@ -21,8 +21,10 @@ function decodeJwtPayload(jwtToken) {
 }
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(null);
-  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(() => localStorage.getItem('token'));
+  const [user, setUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
+  });
   const [isLoading, setIsLoading] = useState(false);
 
   const login = async (email, password) => {
@@ -41,8 +43,11 @@ export function AuthProvider({ children }) {
       const id = response.data?.user?.id || payload?.sub || payload?.id || null;
       const name = response.data?.user?.name || payload?.name || null;
 
+      const userData = { id, role, name };
       setToken(accessToken);
-      setUser({ id, role, name });
+      setUser(userData);
+      localStorage.setItem('token', accessToken);
+      localStorage.setItem('user', JSON.stringify(userData));
 
       return response.data;
     } finally {
@@ -53,6 +58,8 @@ export function AuthProvider({ children }) {
   const logout = () => {
     setToken(null);
     setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   };
 
   const value = useMemo(() => {

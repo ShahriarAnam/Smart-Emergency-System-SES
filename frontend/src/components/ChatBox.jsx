@@ -13,19 +13,19 @@ export default function ChatBox({ requestId, token, currentUserId }) {
   const bottomRef = useRef(null);
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
-  const socket  = useMemo(() => io(SOCKET_URL, { auth: { token } }), [token]);
+  const socket  = useMemo(() => io(SOCKET_URL, { transports: ['polling', 'websocket'], auth: { token } }), [token]);
 
   useEffect(() => {
     if (!requestId || !token) return;
-    axios.get(`${API_URL}/chat/${requestId}/messages`, { headers })
+    axios.get(`${API_URL}/chat/${requestId}/history`, { headers })
       .then(r => setMessages(r.data?.messages || []))
       .catch(() => {});
 
-    socket.emit('join_request_room', { request_id: requestId });
-    socket.on('new_chat_message', msg => {
+    socket.emit('join_room', { request_id: requestId });
+    socket.on('receive_message', msg => {
       setMessages(prev => [...prev, msg]);
     });
-    return () => { socket.emit('leave_request_room', { request_id: requestId }); socket.disconnect(); };
+    return () => { socket.emit('leave_room', { request_id: requestId }); socket.disconnect(); };
   }, [requestId, token]);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function ChatBox({ requestId, token, currentUserId }) {
     if (!draft.trim() || sending) return;
     setSending(true);
     try {
-      await axios.post(`${API_URL}/chat/${requestId}/messages`, { content: draft.trim() }, { headers });
+      await axios.post(`${API_URL}/chat/send`, { request_id: requestId, content: draft.trim() }, { headers });
       setDraft('');
     } catch { /* ignore */ }
     finally { setSending(false); }
