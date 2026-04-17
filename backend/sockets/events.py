@@ -7,7 +7,7 @@ from flask import request
 from flask_socketio import emit, join_room, leave_room
 
 from extensions import db
-from models import Message, User
+from models import Message, User, EmergencyRequest
 
 
 def register_events(socketio):
@@ -108,6 +108,15 @@ def register_events(socketio):
         sender = User.query.get(sender_id)
         if not sender:
             emit('error', {'error': 'Sender not found'})
+            return
+
+        # Only requester and assigned helper may send messages.
+        emergency = EmergencyRequest.query.get(request_id)
+        if not emergency:
+            emit('error', {'error': 'Emergency request not found'})
+            return
+        if sender_id != emergency.requester_id and sender_id != emergency.helper_id:
+            emit('error', {'error': 'Forbidden: not a participant in this request'})
             return
 
         # Create and persist message in database for durable chat history.

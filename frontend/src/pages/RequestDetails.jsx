@@ -124,8 +124,11 @@ export default function RequestDetails() {
   const status      = String(requestData.status || '').toLowerCase();
   const typeMeta    = TYPE_META[requestData.emergency_type] || { icon: '🆘', accent: '#8A8878' };
   const urgencyDot  = URGENCY_DOT[requestData.urgency_level] || '#8A8878';
-  const isAssignedHelper = isHelper && Number(requestData.helper?.id) === Number(user?.id);
-  const showChat    = isRequester ? status !== 'cancelled' : isAssignedHelper && (status === 'accepted' || status === 'completed');
+  const isAssignedHelper = isHelper && String(requestData.helper?.id) === String(user?.id);
+  const isParticipant = isRequester
+    ? String(requestData.requester?.id) === String(user?.id)
+    : isAssignedHelper;
+  const showChat = isParticipant && status !== 'cancelled' && status !== 'pending';
   const helperCanDecide  = isHelper && status === 'pending';
   const helperCanComplete = isHelper && status === 'accepted' && Number(requestData.helper?.id) === Number(user?.id);
   const helperCanCancel  = isHelper && status === 'accepted' && Number(requestData.helper?.id) === Number(user?.id);
