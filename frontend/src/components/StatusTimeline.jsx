@@ -1,78 +1,67 @@
 function formatTimestamp(value) {
-  if (!value) {
-    return 'Not yet';
-  }
-
-  return new Date(value).toLocaleString();
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d.toLocaleString();
 }
 
-function TimelineStep({ title, timestamp, done, color = 'green', hideLine = false }) {
-  let dotClass = 'bg-slate-300';
-  let textClass = 'text-slate-500';
-  let lineClass = 'bg-slate-300';
+const STEPS = [
+  { key: 'created_at',   label: 'Request Created', dotColor: '#D0CEC4', activeColor: '#1854B4' },
+  { key: 'accepted_at',  label: 'Helper Accepted',  dotColor: '#D0CEC4', activeColor: '#1A7F4E' },
+  { key: 'completed_at', label: 'Completed',         dotColor: '#D0CEC4', activeColor: '#1A7F4E' },
+];
 
-  if (color === 'red') {
-    dotClass = 'bg-rose-500';
-    textClass = 'text-rose-700';
-    lineClass = 'bg-rose-300';
-  } else if (done) {
-    dotClass = 'bg-emerald-500';
-    textClass = 'text-emerald-700';
-    lineClass = 'bg-emerald-300';
-  }
+export default function StatusTimeline({ request }) {
+  if (!request) return null;
+  const status = String(request.status || '').toLowerCase();
+  const isCancelled = status === 'cancelled';
 
-  return (
-    <div className="flex gap-4">
-      <div className="flex flex-col items-center">
-        <span className={`h-4 w-4 rounded-full ${dotClass}`} />
-        {!hideLine ? <span className={`mt-1 h-12 w-0.5 ${lineClass}`} /> : null}
-      </div>
-      <div className="pb-3">
-        <p className={`text-sm font-semibold ${textClass}`}>{title}</p>
-        <p className="text-xs text-slate-500">{formatTimestamp(timestamp)}</p>
-      </div>
-    </div>
-  );
-}
-
-export default function StatusTimeline({ createdAt, acceptedAt, completedAt, status }) {
-  const normalizedStatus = String(status || '').toLowerCase();
-  const acceptedDone = Boolean(acceptedAt) || ['accepted', 'completed'].includes(normalizedStatus);
-  const completedDone = Boolean(completedAt) || normalizedStatus === 'completed';
-  const isCancelled = normalizedStatus === 'cancelled';
+  const steps = isCancelled
+    ? [
+        ...STEPS.slice(0, 2),
+        { key: 'completed_at', label: 'Cancelled', dotColor: '#D0CEC4', activeColor: '#D93B2B' },
+      ]
+    : STEPS;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-4 text-base font-semibold text-slate-900">Status Timeline</h3>
+    <div className="card" style={{ padding: '1.25rem 1.5rem' }}>
+      <p style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#8A8878', marginBottom: '1rem' }}>Status Timeline</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {steps.map((step, i) => {
+          const ts   = formatTimestamp(request[step.key]);
+          const done = Boolean(ts);
+          const isLast = i === steps.length - 1;
 
-      <TimelineStep
-        title="Request Created"
-        timestamp={createdAt}
-        done
-      />
+          return (
+            <div key={step.key} style={{ display: 'flex', gap: '0.875rem' }}>
+              {/* Dot + line */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                <div style={{
+                  width: 30, height: 30, borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: done ? `${step.activeColor}14` : '#F7F6F1',
+                  border: `2px solid ${done ? step.activeColor : '#D0CEC4'}`,
+                  fontSize: '0.8125rem',
+                }}>
+                  {done
+                    ? <span style={{ width: 10, height: 10, borderRadius: '50%', background: step.activeColor, display: 'block' }} />
+                    : <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#D0CEC4', display: 'block' }} />}
+                </div>
+                {!isLast && (
+                  <div style={{ width: 2, flex: 1, marginTop: 4, background: done ? `${step.activeColor}30` : '#E4E2DA', minHeight: 28 }} />
+                )}
+              </div>
 
-      <TimelineStep
-        title="Accepted"
-        timestamp={acceptedAt}
-        done={acceptedDone}
-      />
-
-      <TimelineStep
-        title="Completed"
-        timestamp={completedAt}
-        done={completedDone}
-        hideLine={!isCancelled}
-      />
-
-      {isCancelled ? (
-        <TimelineStep
-          title="Cancelled"
-          timestamp={completedAt || acceptedAt || createdAt}
-          done
-          color="red"
-          hideLine
-        />
-      ) : null}
+              {/* Content */}
+              <div style={{ paddingBottom: isLast ? 0 : '1.125rem', flex: 1 }}>
+                <p style={{ fontSize: '0.875rem', fontWeight: 700, color: done ? '#0D0C0A' : '#8A8878', marginBottom: '0.15rem' }}>{step.label}</p>
+                {ts
+                  ? <p style={{ fontSize: '0.75rem', color: '#5A5850' }}>{ts}</p>
+                  : <p style={{ fontSize: '0.75rem', color: '#D0CEC4', fontStyle: 'italic' }}>Not yet reached</p>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

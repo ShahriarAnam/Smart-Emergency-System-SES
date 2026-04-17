@@ -95,6 +95,23 @@ def create_app(config_name=None):
     # Member 4: History and Notifications
     from routes import member4_misc_routes
     app.register_blueprint(member4_misc_routes.bp)
+
+    # Module 3 Blueprints — one per member
+    # Member 1 Module 3: Interactive Dashboard & Emergency Analytics
+    from routes import member1_dashboard_routes
+    app.register_blueprint(member1_dashboard_routes.bp)
+
+    # Member 2 Module 3: Risk Flagging & Urgency-Based Sorting
+    from routes import member2_risk_routes
+    app.register_blueprint(member2_risk_routes.bp)
+
+    # Member 3 Module 3: Status Timeline & Trend Tracking
+    from routes import member3_timeline_routes
+    app.register_blueprint(member3_timeline_routes.bp)
+
+    # Member 4 Module 3: AI Summary (OpenAI) & Performance Metrics
+    from routes import member4_ai_routes
+    app.register_blueprint(member4_ai_routes.bp)
     
     # Keep original routes for backward compatibility (can be deprecated after migration)
     from routes import auth, emergency, helper, notification

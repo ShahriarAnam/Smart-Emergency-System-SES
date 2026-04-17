@@ -1,120 +1,79 @@
-import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
-
-const API_URL = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}/api`;
+import { useContext, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Loader2, Zap } from 'lucide-react';
+import AuthContext from '../context/AuthContext';
 
 export default function Login() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { login } = useAuth();
-
-  const [email, setEmail] = useState('');
+  const { login } = useContext(AuthContext);
+  const navigate  = useNavigate();
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
 
-  const successMessage = location.state?.successMessage || '';
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setError('');
-    setIsSubmitting(true);
-
-    try {
-      // First, submit credentials to the backend login endpoint.
-      await axios.post(`${API_URL}/auth/login`, {
-        email: email.trim(),
-        password,
-      });
-
-      // Then update app-level auth context for protected route access.
-      await login(email.trim(), password);
-
-      // Navigate to dashboard after successful authentication.
-      navigate('/dashboard');
-    } catch (requestError) {
-      const message = requestError.response?.data?.error || 'Invalid email or password';
-      setError(message);
-    } finally {
-      setIsSubmitting(false);
-    }
+  async function handleSubmit(e) {
+    e.preventDefault(); setError(''); setLoading(true);
+    try { await login(email, password); navigate('/dashboard'); }
+    catch (err) { setError(err.response?.data?.error || 'Login failed. Check your credentials.'); }
+    finally { setLoading(false); }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Smart Emergency</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">Welcome Back</h1>
-        <p className="mt-2 text-sm text-slate-600">Sign in to coordinate urgent responses in real time.</p>
-
-        {successMessage ? (
-          <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            {successMessage}
-          </div>
-        ) : null}
-
-        {error ? (
-          <div className="mt-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
-          </div>
-        ) : null}
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              placeholder="you@example.com"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              placeholder="Enter your password"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 font-semibold text-white transition-all duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                Signing in...
-              </span>
-            ) : (
-              'Login'
-            )}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-slate-600">
-          Don&apos;t have an account?{' '}
-          <Link to="/register" className="font-semibold text-blue-700 hover:text-blue-800 hover:underline">
-            Register
-          </Link>
-        </p>
+    <div style={{ minHeight: '100vh', display: 'flex', background: '#F0EFE9' }}>
+      {/* Left panel — brand dark for editorial contrast */}
+      <div className="hidden lg:flex slide-left" style={{ width: '42%', background: '#0D0C0A', borderRight: '1px solid #1E1D1A', flexDirection: 'column', justifyContent: 'space-between', padding: '3rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Zap size={20} style={{ color: '#D93B2B' }} strokeWidth={2.5} />
+          <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: '1.125rem', letterSpacing: '-0.02em', color: '#D93B2B' }}>EMERGON</span>
+        </div>
+        <div>
+          <p style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#353230', marginBottom: '1.25rem' }}>Emergency Response Platform</p>
+          <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 900, fontSize: '3.5rem', letterSpacing: '-0.04em', color: '#F0EFE9', lineHeight: 1.05 }}>
+            Help<br />routed<br />in<br /><span style={{ color: '#D93B2B' }}>seconds.</span>
+          </h1>
+          <p style={{ fontSize: '0.9375rem', color: '#4E4D49', marginTop: '1.5rem', lineHeight: 1.7, maxWidth: 300 }}>
+            A mission-critical platform connecting people in crisis with available helpers in real time.
+          </p>
+        </div>
+        <p style={{ fontSize: '0.75rem', color: '#353230', fontFamily: "'Sora', sans-serif" }}>Smart Emergency System · CSE471</p>
       </div>
+
+      {/* Right panel — light */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: '#F0EFE9' }}>
+        <div className="slide-right" style={{ width: '100%', maxWidth: 400 }}>
+          <div className="flex lg:hidden" style={{ alignItems: 'center', gap: '0.4rem', marginBottom: '2rem' }}>
+            <Zap size={18} style={{ color: '#D93B2B' }} strokeWidth={2.5} />
+            <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: '1rem', color: '#D93B2B' }}>EMERGON</span>
+          </div>
+          <p style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8A8878', marginBottom: '0.5rem' }}>Sign in</p>
+          <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.025em', color: '#0D0C0A', marginBottom: '2rem', lineHeight: 1.15 }}>Welcome back</h2>
+
+          {error && (
+            <div key={error} className="error-shake" style={{ background: '#FEF3F1', border: '1px solid #F5C4BE', borderRadius: 6, padding: '0.75rem 1rem', marginBottom: '1.25rem', fontSize: '0.875rem', color: '#B02E20', fontWeight: 500 }}>{error}</div>
+          )}
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8A8878', marginBottom: '0.375rem', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com" className="input-field" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.6875rem', fontWeight: 700, color: '#8A8878', marginBottom: '0.375rem', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Password</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" className="input-field" />
+            </div>
+            <button type="submit" disabled={loading} className="btn-ink"
+              style={{ marginTop: '0.5rem', padding: '0.75rem', fontSize: '0.9375rem', fontWeight: 700, justifyContent: 'center' }}>
+              {loading ? <><Loader2 size={16} style={{ animation: 'spin 0.7s linear infinite' }} /> Signing in…</> : 'Sign in →'}
+            </button>
+          </form>
+
+          <p style={{ marginTop: '1.5rem', fontSize: '0.875rem', color: '#8A8878', textAlign: 'center' }}>
+            No account?{' '}
+            <Link to="/register" style={{ color: '#D93B2B', fontWeight: 600, textDecoration: 'none' }}>Create one</Link>
+          </p>
+        </div>
+      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

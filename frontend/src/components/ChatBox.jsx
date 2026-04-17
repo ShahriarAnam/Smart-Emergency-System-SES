@@ -1,152 +1,102 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
+import { io } from 'socket.io-client';
+import { Send } from 'lucide-react';
 
-import { joinRoom, leaveRoom, sendMessage, socket } from '../socket';
+const API_URL    = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}/api`;
+const SOCKET_URL =  import.meta.env.VITE_BACKEND_URL   || 'http://localhost:5000';
 
-const API_URL = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}/api`;
-
-function formatTime(value) {
-  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-export default function ChatBox({ requestId, currentUserId, token }) {
+export default function ChatBox({ requestId, token, currentUserId }) {
   const [messages, setMessages] = useState([]);
-  const [draft, setDraft] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [sendError, setSendError] = useState('');
-  const endRef = useRef(null);
+  const [draft,    setDraft]    = useState('');
+  const [sending,  setSending]  = useState(false);
+  const bottomRef = useRef(null);
 
-  const headers = useMemo(
-    () => ({ Authorization: `Bearer ${token}` }),
-    [token]
-  );
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+  const socket  = useMemo(() => io(SOCKET_URL, { auth: { token } }), [token]);
 
   useEffect(() => {
-    if (!requestId || !token) {
-      return;
-    }
+    if (!requestId || !token) return;
+    axios.get(`${API_URL}/chat/${requestId}/messages`, { headers })
+      .then(r => setMessages(r.data?.messages || []))
+      .catch(() => {});
 
-    async function loadHistory() {
-      setIsLoading(true);
-      try {
-        const response = await axios.get(`${API_URL}/notification/messages/${requestId}`, {
-          headers,
-        });
-        setMessages(response.data?.messages || []);
-      } catch (_error) {
-        setMessages([]);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    joinRoom(requestId);
-    loadHistory();
-
-    function onReceiveMessage(message) {
-      if (!message || Number(message.request_id) !== Number(requestId)) {
-        return;
-      }
-
-      setMessages((prev) => [...prev, message]);
-    }
-
-    socket.on('receive_message', onReceiveMessage);
-
-    return () => {
-      leaveRoom(requestId);
-      socket.off('receive_message', onReceiveMessage);
-    };
-  }, [requestId, token, headers]);
+    socket.emit('join_request_room', { request_id: requestId });
+    socket.on('new_chat_message', msg => {
+      setMessages(prev => [...prev, msg]);
+    });
+    return () => { socket.emit('leave_request_room', { request_id: requestId }); socket.disconnect(); };
+  }, [requestId, token]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  function handleSend(event) {
-    event.preventDefault();
-    setSendError('');
-
-    const content = draft.trim();
-    if (!content) {
-      return;
-    }
-
-    const senderId = Number(currentUserId);
-    if (Number.isNaN(senderId) || senderId <= 0) {
-      setSendError('Could not identify your account for chat. Please log in again.');
-      return;
-    }
-
-    sendMessage(Number(requestId), senderId, content);
-    setDraft('');
+  async function sendMessage() {
+    if (!draft.trim() || sending) return;
+    setSending(true);
+    try {
+      await axios.post(`${API_URL}/chat/${requestId}/messages`, { content: draft.trim() }, { headers });
+      setDraft('');
+    } catch { /* ignore */ }
+    finally { setSending(false); }
   }
 
   return (
-    <section className="flex h-[420px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-900">Live Chat</h3>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 480, background: '#FFFFFF', border: '1px solid #E4E2DA', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      {/* Header */}
+      <div style={{ padding: '0.875rem 1.125rem', borderBottom: '1px solid #E4E2DA', display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+        <span className="live-dot" />
+        <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#0D0C0A' }}>Live Chat</p>
+        <span style={{ fontSize: '0.75rem', color: '#8A8878', marginLeft: 'auto' }}>{messages.length} message{messages.length !== 1 ? 's' : ''}</span>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">
-        {isLoading ? (
-          <div className="space-y-3">
-            <div className="h-14 w-7/12 animate-pulse rounded-2xl bg-slate-200" />
-            <div className="ml-auto h-14 w-6/12 animate-pulse rounded-2xl bg-slate-200" />
-            <div className="h-14 w-8/12 animate-pulse rounded-2xl bg-slate-200" />
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.125rem', display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+        {!messages.length && (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <p style={{ fontSize: '0.8125rem', color: '#D0CEC4', fontStyle: 'italic' }}>No messages yet. Start the conversation.</p>
           </div>
-        ) : null}
-        {!isLoading && !messages.length ? <p className="text-sm text-slate-500">No messages yet.</p> : null}
-
-        {messages.map((message) => {
-          const mine = Number(message.sender_id) === Number(currentUserId);
+        )}
+        {messages.map((msg, i) => {
+          const isOwn = msg.sender_id === currentUserId;
           return (
-            <div
-              key={message.id}
-              className={`flex ${mine ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
-                  mine
-                    ? 'bg-blue-600 text-white'
-                    : 'border border-slate-200 bg-white text-slate-800'
-                }`}
-              >
-                <p className={`text-[11px] font-semibold ${mine ? 'text-blue-100' : 'text-slate-500'}`}>
-                  {message.sender_name || 'User'}
-                </p>
-                <p className="mt-0.5 break-words">{message.content}</p>
-                <p className={`mt-1 text-[11px] ${mine ? 'text-blue-100' : 'text-slate-500'}`}>
-                  {formatTime(message.timestamp)}
-                </p>
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: isOwn ? 'flex-end' : 'flex-start' }}>
+              <p style={{ fontSize: '0.6875rem', color: '#8A8878', marginBottom: '0.2rem', fontWeight: 600 }}>
+                {isOwn ? 'You' : (msg.sender_name || 'Helper')}
+              </p>
+              <div style={{
+                maxWidth: '78%', padding: '0.5625rem 0.875rem',
+                background: isOwn ? '#0D0C0A' : '#F7F6F1',
+                color: isOwn ? '#F0EFE9' : '#2E2D2A',
+                borderRadius: isOwn ? '8px 8px 2px 8px' : '8px 8px 8px 2px',
+                border: isOwn ? 'none' : '1px solid #E4E2DA',
+                fontSize: '0.875rem', lineHeight: 1.55,
+              }}>
+                {msg.content}
               </div>
+              <p style={{ fontSize: '0.6875rem', color: '#D0CEC4', marginTop: '0.2rem' }}>
+                {msg.created_at ? new Date(msg.created_at).toLocaleTimeString() : ''}
+              </p>
             </div>
           );
         })}
-
-        <div ref={endRef} />
+        <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={handleSend} className="flex gap-2 border-t border-slate-200 p-3">
+      {/* Input */}
+      <div style={{ padding: '0.75rem 1.125rem', borderTop: '1px solid #E4E2DA', display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
         <input
-          type="text"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Type your message..."
-          className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          value={draft} onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+          placeholder="Type a message…" className="input-field"
+          style={{ flex: 1, fontSize: '0.875rem' }}
         />
-        <button
-          type="submit"
-          disabled={!draft.trim()}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Send
+        <button onClick={sendMessage} disabled={sending || !draft.trim()}
+          style={{ width: 38, height: 38, borderRadius: 6, border: 'none', cursor: draft.trim() ? 'pointer' : 'not-allowed', background: draft.trim() ? '#D93B2B' : '#F7F6F1', color: draft.trim() ? '#fff' : '#D0CEC4', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', flexShrink: 0 }}>
+          <Send size={15} />
         </button>
-      </form>
-
-      {sendError ? (
-        <p className="px-3 pb-3 text-xs font-medium text-rose-600">{sendError}</p>
-      ) : null}
-    </section>
+      </div>
+    </div>
   );
 }

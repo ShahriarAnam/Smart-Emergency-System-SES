@@ -1,126 +1,57 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-
+import { io } from 'socket.io-client';
 import AuthContext from '../context/AuthContext';
-import { socket } from '../socket';
 
-const API_URL = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}/api`;
+const API_URL    = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}/api`;
+const SOCKET_URL =  import.meta.env.VITE_BACKEND_URL   || 'http://localhost:5000';
 
 export default function AvailabilityToggle() {
-  const { user, token } = useContext(AuthContext);
-  const [isAvailable, setIsAvailable] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const { token, user } = useContext(AuthContext);
+  const [available, setAvailable] = useState(false);
+  const [loading,   setLoading]   = useState(false);
 
-  const authHeaders = useMemo(
-    () => ({ Authorization: `Bearer ${token}` }),
-    [token]
-  );
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+  const socket  = useMemo(() => io(SOCKET_URL, { auth: { token } }), [token]);
 
   useEffect(() => {
-    if (!token) {
-      return;
-    }
+    if (!token) return;
+    axios.get(`${API_URL}/helper/profile`, { headers })
+      .then(r => setAvailable(r.data?.helper?.is_available ?? false))
+      .catch(() => {});
+    socket.on('helper_availability_updated', data => {
+      if (data.helper_id === user?.id) setAvailable(data.is_available);
+    });
+    return () => socket.disconnect();
+  }, [token]);
 
-    async function fetchAvailability() {
-      try {
-        const response = await axios.get(`${API_URL}/helper/profile`, { headers: authHeaders });
-        const helper = response.data?.helper;
-
-        if (helper) {
-          setIsAvailable(Boolean(helper.is_available));
-          setLastUpdated(new Date());
-        }
-      } catch (_error) {
-        // Non-blocking UI behavior: silently keep default state.
-      }
-    }
-
-    fetchAvailability();
-  }, [token, authHeaders]);
-
-  useEffect(() => {
-    function onAvailabilityUpdated(payload) {
-      // Update local state only when broadcast matches current logged-in helper.
-      if (payload?.helper_id !== user?.id) {
-        return;
-      }
-
-      setIsAvailable(Boolean(payload?.is_available));
-      setLastUpdated(new Date());
-    }
-
-    socket.on('helper_availability_updated', onAvailabilityUpdated);
-
-    // Cleanup listener when component unmounts.
-    return () => {
-      socket.off('helper_availability_updated', onAvailabilityUpdated);
-    };
-  }, [user?.id]);
-
-  async function handleToggle() {
-    setIsLoading(true);
-
+  async function toggle() {
+    setLoading(true);
     try {
-      const response = await axios.put(
-        `${API_URL}/helper/toggle-availability`,
-        {},
-        { headers: authHeaders }
-      );
-
-      // Update local state immediately for responsive UX.
-      setIsAvailable(Boolean(response.data?.is_available));
-      setLastUpdated(new Date());
-    } catch (_error) {
-      // Non-blocking UI behavior: state remains unchanged on failure.
-    } finally {
-      setIsLoading(false);
-    }
+      const res = await axios.put(`${API_URL}/helper/availability`, { is_available: !available }, { headers });
+      setAvailable(res.data?.helper?.is_available ?? !available);
+      socket.emit('update_availability', { is_available: !available });
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
   }
 
+  const isOn = available;
+
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-bold text-slate-900">Availability</h3>
-          <p className="text-sm text-slate-600">Set your live helper status for incoming emergencies</p>
-        </div>
-
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            isAvailable ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'
-          }`}
-        >
-          {isAvailable ? 'Available' : 'Offline'}
+    <div className="card" style={{ padding: '1.25rem 1.5rem', borderLeft: `3px solid ${isOn ? '#1A7F4E' : '#D0CEC4'}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+      <div>
+        <p style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#8A8878', marginBottom: '0.25rem' }}>Availability</p>
+        <p style={{ fontWeight: 700, fontSize: '0.9375rem', color: isOn ? '#1A7F4E' : '#5A5850' }}>{isOn ? 'Online — accepting requests' : 'Offline'}</p>
+        <p style={{ fontSize: '0.75rem', color: '#8A8878', marginTop: '0.2rem' }}>
+          {isOn ? 'You appear as available to requesters.' : 'Toggle to start accepting emergencies.'}
+        </p>
+      </div>
+      <button onClick={toggle} disabled={loading}
+        style={{ flexShrink: 0, width: 52, height: 28, borderRadius: 99, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', background: isOn ? '#1A7F4E' : '#E4E2DA', position: 'relative', transition: 'background 0.2s ease', outline: 'none' }}>
+        <span style={{ position: 'absolute', top: 3, left: isOn ? 27 : 3, width: 22, height: 22, borderRadius: '50%', background: '#FFFFFF', transition: 'left 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: isOn ? '#1A7F4E' : '#D0CEC4' }} />
         </span>
-      </div>
-
-      <button
-        type="button"
-        onClick={handleToggle}
-        disabled={isLoading}
-        className="group relative inline-flex h-14 w-28 items-center rounded-full bg-slate-300 p-1 transition-all duration-300 ease-out disabled:opacity-60"
-      >
-        <span
-          className={`absolute inset-0 rounded-full transition-colors duration-300 ${
-            isAvailable ? 'bg-emerald-500' : 'bg-slate-400'
-          }`}
-        />
-        <span
-          className={`relative z-10 block h-12 w-12 rounded-full bg-white shadow-lg transition-transform duration-300 ${
-            isAvailable ? 'translate-x-14' : 'translate-x-0'
-          }`}
-        />
       </button>
-
-      <div className="mt-4 space-y-1">
-        <p className={`text-sm font-semibold ${isAvailable ? 'text-emerald-700' : 'text-slate-600'}`}>
-          {isLoading ? 'Updating status...' : isAvailable ? 'Available' : 'Offline'}
-        </p>
-        <p className="text-xs text-slate-500">
-          Last updated: {lastUpdated ? lastUpdated.toLocaleTimeString() : 'Not synced yet'}
-        </p>
-      </div>
-    </section>
+    </div>
   );
 }

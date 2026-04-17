@@ -20,12 +20,20 @@ class Config:
     """Base configuration class for all environments"""
     
     # ---- DATABASE CONFIGURATION ----
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        'DATABASE_URL',
-        'sqlite:///smart_emergency.db'
-    )
+    _db_url = os.getenv('DATABASE_URL', 'sqlite:///smart_emergency.db')
+    # Render/Heroku may supply "postgres://" — SQLAlchemy requires "postgresql://"
+    if _db_url.startswith('postgres://'):
+        _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+    SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ENGINE_OPTIONS = {}
+
+    # PostgreSQL connection pool settings (ignored for SQLite)
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,      # verify connections before checkout
+        'pool_recycle': 300,         # recycle connections every 5 min
+        'pool_size': 5,
+        'max_overflow': 10,
+    }
     
     # ---- JWT (JSON Web Token) CONFIGURATION ----
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production-immediately')
@@ -56,6 +64,7 @@ class Config:
     TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', '')
     TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', '')
     TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER', '')
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')  # Member 4 Module 3: AI summarisation
     
     # ---- LOGGING ----
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
@@ -83,7 +92,7 @@ class TestingConfig(Config):
     TESTING = True
     # Use file-based SQLite for testing to avoid PostgreSQL dependency.
     SQLALCHEMY_DATABASE_URI = 'sqlite:///testing.db'
-    SQLALCHEMY_ENGINE_OPTIONS = {}
+    SQLALCHEMY_ENGINE_OPTIONS = {}   # no pool settings for SQLite
     JWT_SECRET_KEY = 'test-secret-key-do-not-use-in-production'
     SOCKETIO_ASYNC_MODE = 'threading'  # Use threading for tests and local smoke runs
 

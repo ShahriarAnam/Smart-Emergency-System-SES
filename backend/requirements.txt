@@ -19,6 +19,7 @@ python-dotenv==1.0.0
 google-maps-services==1.5.3
 twilio==8.10.0
 requests==2.31.0
+openai>=2.0.0
 
 # Utilities
 Werkzeug==2.3.7

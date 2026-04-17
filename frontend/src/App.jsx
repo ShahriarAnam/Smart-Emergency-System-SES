@@ -10,12 +10,20 @@ import RequestDetails from './pages/RequestDetails';
 import NotificationHistory from './pages/NotificationHistory';
 import AppNavbar from './components/AppNavbar';
 
+// Module 3 pages
+import AnalyticsDashboard from './pages/AnalyticsDashboard';
+import RiskFlagged from './pages/RiskFlagged';
+import TrendsDashboard from './pages/TrendsDashboard';
+import AIAssistant from './pages/AIAssistant';
+
 function LoadingScreen() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100">
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-medium tracking-wide text-slate-700">Loading...</p>
+    <div style={{ minHeight: '100vh', background: '#F0EFE9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="scale-in" style={{ background: '#FFFFFF', border: '1px solid #E4E2DA', borderRadius: 12, padding: '1.75rem 2.5rem', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid #E4E2DA', borderTopColor: '#D93B2B', animation: 'spin 0.7s linear infinite', margin: '0 auto 1rem' }} />
+        <p style={{ fontFamily: "'Sora', sans-serif", fontSize: '0.8125rem', fontWeight: 600, color: '#8A8878', letterSpacing: '0.04em' }}>Loading…</p>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
@@ -40,7 +48,7 @@ function PrivateRoute({ role = 'any', children }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 [font-family:Inter,sans-serif] text-slate-900">
+    <div style={{ minHeight: '100vh', background: '#F0EFE9', color: '#0D0C0A', fontFamily: "'Sora', sans-serif" }}>
       <AppNavbar />
       {children}
     </div>
@@ -86,6 +94,43 @@ function AppRoutes() {
         element={
           <PrivateRoute role="any">
             <NotificationHistory />
+          </PrivateRoute>
+        }
+      />
+
+      {/* Module 3 Routes */}
+      <Route
+        path="/analytics"
+        element={
+          <PrivateRoute role="any">
+            <AnalyticsDashboard />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/risk"
+        element={
+          <PrivateRoute role="any">
+            <RiskFlagged />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/trends"
+        element={
+          <PrivateRoute role="any">
+            <TrendsDashboard />
+          </PrivateRoute>
+        }
+      />
+
+      <Route
+        path="/ai"
+        element={
+          <PrivateRoute role="any">
+            <AIAssistant />
           </PrivateRoute>
         }
       />
