@@ -238,7 +238,7 @@ export default function RequestDetails() {
       </div>
 
       {/* ── Requester Location Map ───────────────────────────────────── */}
-      {isParticipant && requestData.latitude && requestData.longitude && status !== 'pending' && (
+      {(isHelper || isParticipant) && requestData.latitude && requestData.longitude && (
         <div className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
           <p style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#8A8878', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
             <MapPin size={12} /> Requester Location

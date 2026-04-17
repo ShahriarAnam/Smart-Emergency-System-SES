@@ -52,6 +52,11 @@ export default function NotificationHistory() {
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   useEffect(() => {
+    localStorage.setItem('historyLastRead', new Date().toISOString());
+    window.dispatchEvent(new Event('historyRead'));
+  }, []);
+
+  useEffect(() => {
     if (!token) return;
     async function loadHistory() {
       setIsLoading(true);

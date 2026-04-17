@@ -3,9 +3,10 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   Activity, BarChart3, Bell, Bot, LogOut,
-  Menu, Plus, ShieldAlert, TrendingUp, X, Zap,
+  Menu, Plus, ShieldAlert, TrendingUp, Users, X, Zap,
 } from 'lucide-react';
 import AuthContext from '../context/AuthContext';
+import { socket } from '../socket';
 
 const API_URL = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'}/api`;
 
@@ -25,6 +26,8 @@ export default function AppNavbar() {
   const [mobileOpen,    setMobileOpen]    = useState(false);
   const [helperOnline,  setHelperOnline]  = useState(false);
   const [toggling,      setToggling]      = useState(false);
+  const [onlineCount,   setOnlineCount]   = useState(0);
+  const [hasUnread,     setHasUnread]     = useState(false);
 
   useEffect(() => {
     if (!token || !isHelper) return;
@@ -32,6 +35,45 @@ export default function AppNavbar() {
       .then(r => setHelperOnline(r.data?.helper?.is_available ?? false))
       .catch(() => {});
   }, [token, isHelper]);
+
+  // Online helpers count
+  useEffect(() => {
+    if (!token) return;
+    function fetchCount() {
+      axios.get(`${API_URL}/helper/available`)
+        .then(r => setOnlineCount(r.data?.helpers?.length ?? 0))
+        .catch(() => {});
+    }
+    fetchCount();
+    socket.on('helper_availability_updated', fetchCount);
+    return () => socket.off('helper_availability_updated', fetchCount);
+  }, [token]);
+
+  // Unread history badge
+  useEffect(() => {
+    if (!token) return;
+    function checkUnread() {
+      const lastRead = localStorage.getItem('historyLastRead');
+      axios.get(`${API_URL}/notification/history`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => {
+          const items = r.data?.history || [];
+          const hasNew = items.some(item => {
+            const t = item.request?.created_at || item.request?.accepted_at;
+            return t && (!lastRead || new Date(t) > new Date(lastRead));
+          });
+          setHasUnread(hasNew);
+        })
+        .catch(() => {});
+    }
+    checkUnread();
+    socket.on('new_emergency_request',    checkUnread);
+    socket.on('request_status_updated',   checkUnread);
+    window.addEventListener('historyRead', () => setHasUnread(false));
+    return () => {
+      socket.off('new_emergency_request',  checkUnread);
+      socket.off('request_status_updated', checkUnread);
+    };
+  }, [token]);
 
   async function toggleAvailability() {
     if (toggling) return;
@@ -94,6 +136,9 @@ export default function AppNavbar() {
             >
               <Icon size={13} strokeWidth={2} />
               {label}
+              {to === '/notification/history' && hasUnread && (
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#D93B2B', display: 'inline-block', marginLeft: 2, flexShrink: 0 }} />
+              )}
             </NavLink>
           ))}
         </div>
@@ -133,6 +178,12 @@ export default function AppNavbar() {
               </button>
             </div>
           )}
+
+          {/* Online helpers counter */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', fontWeight: 600, color: onlineCount > 0 ? '#15663E' : '#8A8878', background: onlineCount > 0 ? '#EDF8F2' : '#F7F6F1', border: `1px solid ${onlineCount > 0 ? '#A8DCBC' : '#D0CEC4'}`, borderRadius: 99, padding: '0.2rem 0.6rem', fontFamily: "'Sora', sans-serif", flexShrink: 0 }}>
+            <Users size={11} strokeWidth={2.5} />
+            {onlineCount} online
+          </div>
 
           <span style={{ ...roleStyle, fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderRadius: 3, padding: '0.18rem 0.5rem', fontFamily: "'Sora', sans-serif" }}>
             {role}
