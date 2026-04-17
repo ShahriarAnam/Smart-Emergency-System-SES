@@ -2,7 +2,10 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import { ArrowLeft, MapPin, User, UserCheck } from 'lucide-react';
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 import AuthContext from '../context/AuthContext';
 import ChatBox from '../components/ChatBox';
@@ -28,6 +31,17 @@ const STATUS_BADGE = {
 
 function SkeletonBlock({ h = 20, w = '100%' }) {
   return <div className="shimmer" style={{ height: h, width: w, marginBottom: '0.5rem' }} />;
+}
+
+function RequesterMap({ lat, lng }) {
+  const { isLoaded } = useJsApiLoader({ googleMapsApiKey: GOOGLE_MAPS_API_KEY });
+  const center = useMemo(() => ({ lat: Number(lat), lng: Number(lng) }), [lat, lng]);
+  if (!isLoaded) return <div className="shimmer" style={{ height: 280, borderRadius: 8 }} />;
+  return (
+    <GoogleMap mapContainerStyle={{ width: '100%', height: 280, borderRadius: 8 }} center={center} zoom={15}>
+      <Marker position={center} />
+    </GoogleMap>
+  );
 }
 
 export default function RequestDetails() {
@@ -222,6 +236,19 @@ export default function RequestDetails() {
           </div>
         </div>
       </div>
+
+      {/* ── Requester Location Map ───────────────────────────────────── */}
+      {isParticipant && requestData.latitude && requestData.longitude && status !== 'pending' && (
+        <div className="card" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
+          <p style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#8A8878', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <MapPin size={12} /> Requester Location
+          </p>
+          <RequesterMap lat={requestData.latitude} lng={requestData.longitude} />
+          <p style={{ fontSize: '0.75rem', color: '#8A8878', marginTop: '0.5rem', fontVariantNumeric: 'tabular-nums' }}>
+            {Number(requestData.latitude).toFixed(5)}, {Number(requestData.longitude).toFixed(5)}
+          </p>
+        </div>
+      )}
 
       {/* ── Actions ──────────────────────────────────────────────────── */}
       {hasActions && (
