@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { ArrowLeft, MapPin, User, UserCheck } from 'lucide-react';
 
 import AuthContext from '../context/AuthContext';
@@ -71,7 +72,14 @@ export default function RequestDetails() {
     setActionLoading(true);
     try {
       await axios.put(`${API_URL}/emergency/${id}/${path}`, {}, { headers });
+      if (path === 'reject') {
+        toast.success('Request rejected.');
+        navigate('/dashboard');
+        return;
+      }
       await fetchRequest();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Action failed.');
     } finally {
       setActionLoading(false);
     }
@@ -116,7 +124,8 @@ export default function RequestDetails() {
   const status      = String(requestData.status || '').toLowerCase();
   const typeMeta    = TYPE_META[requestData.emergency_type] || { icon: '🆘', accent: '#8A8878' };
   const urgencyDot  = URGENCY_DOT[requestData.urgency_level] || '#8A8878';
-  const showChat    = isRequester ? status !== 'cancelled' : status === 'accepted' || status === 'completed';
+  const isAssignedHelper = isHelper && Number(requestData.helper?.id) === Number(user?.id);
+  const showChat    = isRequester ? status !== 'cancelled' : isAssignedHelper && (status === 'accepted' || status === 'completed');
   const helperCanDecide  = isHelper && status === 'pending';
   const helperCanComplete = isHelper && status === 'accepted' && Number(requestData.helper?.id) === Number(user?.id);
   const helperCanCancel  = isHelper && status === 'accepted' && Number(requestData.helper?.id) === Number(user?.id);
