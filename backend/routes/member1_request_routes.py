@@ -49,27 +49,39 @@ def _parse_enum(enum_cls, raw_value):
     return None
 
 
+def _normalize_phone(phone):
+    """Convert stored Bangladesh phone number to E.164 format required by Twilio."""
+    if not phone:
+        return None
+    phone = str(phone).strip().replace(' ', '').replace('-', '')
+    if phone.startswith('+'):
+        return phone
+    if phone.startswith('880'):
+        return '+' + phone
+    if phone.startswith('0'):
+        return '+880' + phone[1:]
+    return '+880' + phone
+
+
 def _send_sms(to_phone, body):
-    """
-    Send SMS via Twilio in a safe, non-blocking way.
-    Any failure is swallowed so SMS problems never break API responses.
-    """
+    """Send SMS via Twilio. Failures are logged but never break API responses."""
     account_sid = os.getenv('TWILIO_ACCOUNT_SID')
-    auth_token = os.getenv('TWILIO_AUTH_TOKEN')
-    from_phone = os.getenv('TWILIO_PHONE_NUMBER')
-    
-    if not account_sid or not auth_token or not from_phone or not to_phone:
+    auth_token  = os.getenv('TWILIO_AUTH_TOKEN')
+    from_phone  = os.getenv('TWILIO_PHONE_NUMBER')
+    to_e164     = _normalize_phone(to_phone)
+
+    if not account_sid or not auth_token or not from_phone or not to_e164:
+        print(f'[SMS] Skipped — missing config or phone. to={to_phone}')
         return
-    
+
     try:
         client = Client(account_sid, auth_token)
-        client.messages.create(
-            body=body,
-            from_=from_phone,
-            to=to_phone,
-        )
-    except (TwilioRestException, Exception):
-        pass
+        client.messages.create(body=body, from_=from_phone, to=to_e164)
+        print(f'[SMS] Sent to {to_e164}')
+    except TwilioRestException as e:
+        print(f'[SMS] Twilio error to {to_e164}: {e}')
+    except Exception as e:
+        print(f'[SMS] Unexpected error to {to_e164}: {e}')
 
 
 def requester_required(fn):
@@ -168,7 +180,13 @@ def create_emergency_request():
     socketio.emit('new_emergency_request', {
         'request': emergency.to_dict(),
     })
-    
+
+    # Confirm request creation to requester via SMS
+    _send_sms(
+        g.current_requester.phone,
+        f'Your {emergency.emergency_type.value} emergency request has been submitted. Urgency: {emergency.urgency_level.value}. We are finding a helper for you.',
+    )
+
     return jsonify({
         'message': 'Emergency request created successfully',
         'request': emergency.to_dict(),

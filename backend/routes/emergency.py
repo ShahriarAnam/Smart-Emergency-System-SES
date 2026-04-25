@@ -50,32 +50,39 @@ def _parse_enum(enum_cls, raw_value):
     return None
 
 
+def _normalize_phone(phone):
+    """Convert stored Bangladesh phone number to E.164 format required by Twilio."""
+    if not phone:
+        return None
+    phone = str(phone).strip().replace(' ', '').replace('-', '')
+    if phone.startswith('+'):
+        return phone
+    if phone.startswith('880'):
+        return '+' + phone
+    if phone.startswith('0'):
+        return '+880' + phone[1:]
+    return '+880' + phone
+
+
 def _send_sms(to_phone, body):
-    """
-    Send SMS via Twilio in a safe, non-blocking way.
-
-    Any failure is swallowed so SMS problems never break API responses.
-    """
-    # Load Twilio config from environment variables.
+    """Send SMS via Twilio. Failures are logged but never break API responses."""
     account_sid = os.getenv('TWILIO_ACCOUNT_SID')
-    auth_token = os.getenv('TWILIO_AUTH_TOKEN')
-    from_phone = os.getenv('TWILIO_PHONE_NUMBER')
+    auth_token  = os.getenv('TWILIO_AUTH_TOKEN')
+    from_phone  = os.getenv('TWILIO_PHONE_NUMBER')
+    to_e164     = _normalize_phone(to_phone)
 
-    # If Twilio env vars are missing or destination number absent, skip silently.
-    if not account_sid or not auth_token or not from_phone or not to_phone:
+    if not account_sid or not auth_token or not from_phone or not to_e164:
+        print(f'[SMS] Skipped — missing config or phone. to={to_phone}')
         return
 
     try:
-        # Initialize Twilio client and send the message.
         client = Client(account_sid, auth_token)
-        client.messages.create(
-            body=body,
-            from_=from_phone,
-            to=to_phone,
-        )
-    except (TwilioRestException, Exception):
-        # Intentionally ignore SMS failures to keep API stable.
-        pass
+        client.messages.create(body=body, from_=from_phone, to=to_e164)
+        print(f'[SMS] Sent to {to_e164}')
+    except TwilioRestException as e:
+        print(f'[SMS] Twilio error to {to_e164}: {e}')
+    except Exception as e:
+        print(f'[SMS] Unexpected error to {to_e164}: {e}')
 
 
 def requester_required(fn):
@@ -337,11 +344,10 @@ def accept_emergency_request(request_id):
         'helper_id': helper.id,
     })
 
-    # Notify requester by SMS; never fail API if SMS sending fails.
     requester = emergency.requester
     _send_sms(
         requester.phone if requester else None,
-        f'Your {emergency.emergency_type.value} request has been accepted by {helper.name}.',
+        f'Your {emergency.emergency_type.value} emergency request has been accepted by {helper.name}. They are on their way.',
     )
 
     # Return updated request payload.
@@ -416,11 +422,10 @@ def complete_emergency_request(request_id):
         'helper_id': helper.id,
     })
 
-    # Notify requester by SMS; failures are intentionally ignored.
     requester = emergency.requester
     _send_sms(
         requester.phone if requester else None,
-        'Your request has been completed.',
+        f'Your {emergency.emergency_type.value} emergency request has been completed. Thank you for using Smart Emergency System.',
     )
 
     # Return updated request object.
