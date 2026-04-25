@@ -14,7 +14,6 @@ from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from twilio.base.exceptions import TwilioRestException
 from twilio.rest import Client
-from twilio.twiml.voice_response import VoiceResponse
 
 from extensions import db, socketio
 from models import User, UserRole, EmergencyRequest, EmergencyType, UrgencyLevel, EmergencyStatus
@@ -76,15 +75,13 @@ def _send_sms(to_phone, body):
         return
 
     try:
-        twiml = VoiceResponse()
-        twiml.say(body, voice='alice', language='en-US')
         client = Client(account_sid, auth_token)
-        client.calls.create(twiml=str(twiml), from_=from_phone, to=to_e164)
-        print(f'[CALL] Initiated to {to_e164}')
+        client.messages.create(body=body, from_=from_phone, to=to_e164)
+        print(f'[SMS] Sent to {to_e164}')
     except TwilioRestException as e:
-        print(f'[CALL] Twilio error to {to_e164}: {e}')
+        print(f'[SMS] Twilio error to {to_e164}: {e}')
     except Exception as e:
-        print(f'[CALL] Unexpected error to {to_e164}: {e}')
+        print(f'[SMS] Unexpected error to {to_e164}: {e}')
 
 
 def requester_required(fn):
